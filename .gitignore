@@ -1,3 +1,23 @@
+
+# MiniScript ignore list
+build/
+MiniScript/.import/
+release/
+debug/
+*__pycache__/
+.vs/
+.vscode/
+
+config.json
+*.dblite
+*.idb
+*.pdb
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.obj.enc
+
 # Prerequisites
 *.d
 
