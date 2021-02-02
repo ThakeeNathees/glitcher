@@ -16,7 +16,12 @@ _global_script_class_icons={
 [application]
 
 config/name="MiniScript"
+run/main_scene="res://test/TestMain.tscn"
 config/icon="res://icon.png"
+
+[display]
+
+window/dpi/allow_hidpi=true
 
 [rendering]
 

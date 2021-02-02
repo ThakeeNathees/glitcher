@@ -7,8 +7,9 @@ def target_path(name):
 	return os.path.join('bin/', name)
 	
 ## ide debug run target
-env.RUN_TARGET = 'Godot 3.2.2.exe'
-env.RUN_ARGS = '--path MiniScript'
+env.RUN_TARGET = 'Godot 3.2.2.exe --path MiniScript'
+if env['platform'] == 'windows':
+	env.RUN_TARGET = 'build/windows/run.bat'
 
 ## include directories
 env.Append(CPPPATH=[
@@ -28,12 +29,12 @@ env.Append(LIBS=['libgodot-cpp.{}.{}.{}{}'.format(
 
 ## lib sources
 env.SOURCES = [
-	Glob("src/*.cpp"),
+	Glob("src/test/*.cpp"),
 ]
 
 ## only for ide
 env.ALL_SOURCES = []
 env.ALL_SOURCES += env.SOURCES
 
-library = env.SharedLibrary(target="bin/" + 'libgdexample', source=env.SOURCES)
+library = env.SharedLibrary(target="bin/" + 'testlib', source=env.SOURCES)
 

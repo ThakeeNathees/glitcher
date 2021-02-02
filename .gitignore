@@ -1,6 +1,8 @@
 
 # MiniScript ignore list
 build/
+MiniScript/test/
+src/test/
 MiniScript/.import/
 release/
 debug/

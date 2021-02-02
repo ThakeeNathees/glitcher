@@ -153,13 +153,11 @@ SConscript('SConscript', variant_dir=get_variant_dir(env), duplicate=0)
 def get_vsproj_context():
 	targets = []
 	variants = [] ## ["debug|Win32", "debug|x64", "release|Win32", "release|x64"]
-	cmdargs = []
 	for target in 'debug', 'release':
 		for bits in '32', '64':
 			variants.append(target+'|'+('Win32' if bits=='32' else 'x64'))
 			targets.append(env.RUN_TARGET)
-			cmdargs.append(env.RUN_ARGS)
-	return variants, targets, cmdargs
+	return variants, targets
 
 def msvs_collect_header():
 
@@ -213,13 +211,12 @@ if env['vsproj']:
 	env["MSVSCLEANCOM"] = msvc_build_commandline(
 		"scons --directory=\"$(ProjectDir.TrimEnd('\\'))\" --clean platform=windows bits=!bits! target=$(Configuration)"
 	)
-	variants, targets, cmdargs = get_vsproj_context()
+	variants, targets = get_vsproj_context()
 	env.MSVSProject(target = env.PROJECT_NAME + env['MSVSPROJECTSUFFIX'],
 		srcs = msvc_collect_sources(),
 		incs = msvs_collect_header(),
 		variant = variants,
 		runfile = targets,
-		cmdargs = cmdargs,
 		buildtarget = targets,
 	)
 
