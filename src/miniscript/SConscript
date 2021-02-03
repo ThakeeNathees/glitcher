@@ -1,0 +1,23 @@
+Import('env')
+import os
+
+## miniscript vm lib
+vm = env.Library(
+	target='bin/miniscript',
+	source=[ Glob('src/*.c') ],
+	CPPPATH=['include/']
+)
+
+## test executable
+test = env.Program(
+	target='bin/miniscript',
+	source=['test/main.c'],
+	LIBPATH='bin',
+	LIBS='miniscript',
+)
+
+Requires(test, vm)
+
+## for ide
+#env.ALL_SOURCES += SOURCES
+

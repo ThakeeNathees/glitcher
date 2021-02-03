@@ -11,6 +11,7 @@ debug/
 .vscode/
 
 config.json
+run.bat
 *.dblite
 *.idb
 *.pdb

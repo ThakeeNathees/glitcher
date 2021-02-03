@@ -159,39 +159,24 @@ def get_vsproj_context():
 			targets.append(env.RUN_TARGET)
 	return variants, targets
 
-def msvs_collect_header():
 
-	def recursive_collect(dir):
-		ret = []
-		for file in os.listdir(dir):
-			file = os.path.join(dir, file)
-			if os.path.isfile(file):
-				if (file.endswith('.h') or file.endswith('.hpp')):
-					ret.append('$(ProjectDir)' + os.path.relpath(file))
-			elif os.path.isdir(file):
-				ret += recursive_collect(file)
-		return ret
-
+def recursive_collect(dir, suffix):
 	ret = []
-	for dir in env['CPPPATH']:
-		ret += recursive_collect(str(dir))
+	for file in os.listdir(dir):
+		file = os.path.join(dir, file)
+		if os.path.isfile(file):
+			for suff in suffix:
+				if (file.endswith(suff)):
+					ret.append('$(ProjectDir)' + os.path.relpath(file))
+		elif os.path.isdir(file):
+			ret += recursive_collect(file, suffix)
 	return ret
+
+def msvs_collect_header():
+	return recursive_collect('.', ('.h', '.hpp'))
 
 def msvc_collect_sources():
-	ret = []
-	for src in env.ALL_SOURCES:
-		if (str(src).endswith('.c')  or str(src).endswith('.cpp') or 
-			str(src).endswith('.cc') or str(src).endswith('.cxx')):
-			ret.append(str(src))
-		else: ## Glob
-			for _src in src:
-				if (str(_src).endswith('.obj')):
-					ret.append(str(_src).replace('.obj', '.cpp'))
-				else:
-					assert(str(_src).endswith('.c')  or str(_src).endswith('.cpp') or 
-						   str(_src).endswith('.cc') or str(_src).endswith('.cxx'))
-					ret.append(str(_src))
-	return ret
+	return recursive_collect('.', ('.c', '.cpp', '.cc', '.cxx'))
 
 def msvc_build_commandline(commands):
 	common_build_prefix = [

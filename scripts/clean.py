@@ -52,6 +52,7 @@ def clean():
 			'MiniScript.vcxproj',
 			'MiniScript.vcxproj.filters',
 			'MiniScript.vcxproj.user',
+			'run.bat',
 		]
 		
 		for file in os.listdir('.'):

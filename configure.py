@@ -4,7 +4,7 @@ import json
 CONFIG_FILE = 'config.json'
 
 data = {
-	'godot-path': 'path/to/godot.binary',
+	'godot-path': '%USERPROFILE%/Desktop/Godot 3.2.2.exe',
 }
 
 def main():
@@ -27,14 +27,11 @@ def update_subdirs():
 	def mkdirs_if_not_exist(path):
 		if not os.path.exists(path):
 			os.makedirs(path)
-	mkdirs_if_not_exist('build/')
-	if sys.platform == 'win32':
-		mkdirs_if_not_exist('build/windows')
 
 def update_config():
 	log("updating configuration")
 	if sys.platform == 'win32':
-		with open('build/windows/run.bat', 'w') as run_file:
+		with open('run.bat', 'w') as run_file:
 			run_file.write('@echo off\n"%s" --path "%s"' % (data['godot-path'],
 				os.path.join(os.getcwd(), 'MiniScript/')))
 	log("configuration updated")
