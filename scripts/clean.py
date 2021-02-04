@@ -61,6 +61,11 @@ def clean():
 					remove_list.append(file)
 	remove_all(remove_list)
 	
+	## clean generated source files
+	sys.path.insert(1, 'src/miniscript/src/buffer')
+	import buffergen
+	buffergen.clean()
+
 	log('done cleaning')
 
 if __name__ == '__main__':
