@@ -44,12 +44,14 @@ def _gen():
  * when generating the source. */
 typedef uint8_t $type$;
 ''', '')
+		_header = _header.replace('_$name$', '_' + _type[0].lower())
 		_header = _header.replace('$name$', _type[0])
 		_header = _header.replace('$type$', _type[1])
 
 		_source = source.replace('''\
 /** Replace the following line with "$name$_buffer.h" */
 #include "buffer.template.h"''', '#include "%s_buffer.gen.h"' % _type[0].lower())
+		_source = _source.replace('_$name$', '_' + _type[0].lower())
 		_source = _source.replace('$name$', _type[0])
 		_source = _source.replace('$type$', _type[1])
 

@@ -113,11 +113,11 @@
 #define PAYLOAD_OBJECT  ((uint64_t)0x0000ffffffffffff)
 
 /** primitive types */
-#define VAR_NULL  (MASK_QNAN | (uint64_t)0x0000000000000000)
-#define VAR_UNDEF (MASK_QNAN | (uint64_t)0x0001000000000000)
-#define VAR_VOID  (MASK_QNAN | (uint64_t)0x0001000000000001)
-#define VAR_FALSE (MASK_QNAN | (uint64_t)0x0001000000000002)
-#define VAR_TRUE  (MASK_QNAN | (uint64_t)0x0001000000000003)
+#define VAR_NULL      (MASK_QNAN | (uint64_t)0x0000000000000000)
+#define VAR_UNDEFINED (MASK_QNAN | (uint64_t)0x0001000000000000)
+#define VAR_VOID      (MASK_QNAN | (uint64_t)0x0001000000000001)
+#define VAR_FALSE     (MASK_QNAN | (uint64_t)0x0001000000000002)
+#define VAR_TRUE      (MASK_QNAN | (uint64_t)0x0001000000000003)
 
 /** encode types */
 #define VAR_BOOL(value) ((value)? VAR_TRUE : VAR_FALSE)

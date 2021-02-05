@@ -14,11 +14,10 @@
 
 typedef struct Parser {
 
-	/* TODO:
-	 *     VM* vm; // owner vm for reporting errors
-	 */
+	// Owner of the parser (for reporting errors, etc).
+	VM* vm;
 
-	 // Currently compiled source.
+	// Currently compiled source.
 	const char* source;
 
 	// Start of the currently parsed token.
@@ -37,6 +36,32 @@ typedef struct Parser {
 	bool has_errors;
 } Parser;
 
-/** Parser function declarations. */
+
+// Initialize the parser.
+void ms_parserInit(Parser* self);
+
+// Returns the current char of the parser on.
+char ms_parserPeekChar(Parser* self);
+
+// Returns the next char of the parser on.
+char ms_parserPeekNextChar(Parser* self);
+
+// Advance the parser by 1 char.
+char ms_parserEatChar(Parser* self);
+
+// If the current char is [c] consume it and advance char by 1 and returns
+// true otherwise returns false.
+bool ms_parserMatchChar(Parser* self, char c);
+
+// Make and initialize the type as the next token.
+void ms_parserEatToken(Parser* self, TokenType type);
+
+// If the current char is [c] eat the char and add token two otherwise eat
+// append token one.
+void ms_parserEatTwoCharToken(Parser* self, char c, TokenType one,
+                              TokenType two);
+
+
+
 
 #endif // PARSER_H

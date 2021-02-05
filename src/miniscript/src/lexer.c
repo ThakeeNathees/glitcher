@@ -10,7 +10,7 @@ typedef struct {
 	TokenType tk_type;
 } _Keyword;
 
- /** List of keywords mapped into their identifiers */
+// List of keywords mapped into their identifiers.
 static _Keyword _keywords[] = {
 	{ "type",     TK_TYPE },
 	{ "enum",     TK_ENUM },
@@ -38,12 +38,3 @@ static _Keyword _keywords[] = {
 };
 
 
-/** Lexer function implementations. */
-
-bool ms_isName(char c) {
-	return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || (c == '_');
-}
-
-bool ms_isDigit(char c) {
-	return ('0' <= c && c <= '9');
-}

@@ -13,7 +13,7 @@
 
 typedef enum {
 
-	TK_UNKNOWN = 0,
+	TK_ERROR = 0,
 	TK_EOF,
 	TK_LINE,
 
@@ -102,7 +102,7 @@ typedef enum {
 	 *   TK_STR_INTERP  " c "
 	 *   TK_NAME        d
 	 *   TK_STRING     " e" */
-	TK_STR_INTERP,
+	// TK_STR_INTERP, //< not yet.
 
 } TokenType;
 
@@ -115,16 +115,12 @@ typedef struct Token {
 	// Number of chars of the token.
 	int length;
 
+	// Line number of the token (1 based)
+	int line;
+
 	// Literal value of the token.
 	var value;
 } Token;
 
-/** Lexer function declarations. */
-
-/** Returns true if `c` is [A-Za-z_]. */
-bool ms_isName(char c);
-
-/** Returns true if `c` is [0-9] */
-bool ms_isDigit(char c);
 
 #endif // LEXER_H

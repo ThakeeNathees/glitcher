@@ -11,5 +11,10 @@
  * Reference    : http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float */
 int ms_powerOf2Ceil(int n);
 
+/** Returns true if `c` is [A-Za-z_]. */
+bool ms_isName(char c);
+
+/** Returns true if `c` is [0-9] */
+bool ms_isDigit(char c);
 
 #endif // MS_UTILS_H

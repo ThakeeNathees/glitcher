@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-/* miniscript visibility macros. define MS_DLL for using miniscript as a 
- * shared library and define MS_COMPILE to export symbols. */
+// miniscript visibility macros. define MS_DLL for using miniscript as a 
+// shared library and define MS_COMPILE to export symbols.
 
 #ifdef _MSC_VER
   #define _MS_EXPORT __declspec(dllexport)
