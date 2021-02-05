@@ -4,7 +4,11 @@ import os
 ## miniscript vm lib
 vm = env.Library(
 	target='bin/miniscript',
-	source=[ Glob('src/*.c') ],
+	source=[
+		Glob('src/*.c'),
+		Glob('src/types/*.c'),
+		Glob('src/types/gen/*.c'),
+	],
 	CPPPATH=['include/']
 )
 
@@ -12,6 +16,7 @@ vm = env.Library(
 test = env.Program(
 	target='bin/miniscript',
 	source=['test/main.c'],
+	CPPPATH=['include/'],
 	LIBPATH='bin',
 	LIBS='miniscript',
 )

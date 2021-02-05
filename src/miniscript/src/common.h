@@ -36,5 +36,48 @@
   #define MS_PUBLIC
 #endif
 
+#ifdef DEBUG
+
+#include <stdio.h>
+
+#define ASSERT(condition, message)                                       \
+    do {                                                                 \
+        if (!(condition)) {                                              \
+            fprintf(stderr, "Assertion failed: %s\n\tat %s() (%s:%i)\n", \
+                message, __func__, __FILE__, __LINE__);                  \
+            abort();                                                     \
+        }                                                                \
+    } while (false)
+
+#define UNREACHABLE()                                                    \
+    do {                                                                 \
+        fprintf(stderr, "Execution reached an unreachable path\n"        \
+            "\tat %s() (%s:%i)\n", __FILE__, __LINE__, __func__);        \
+        abort();                                                         \
+    } while (false)
+
+#else
+
+#define ASSERT(condition, message) do { } while (false)
+
+// Reference : https://github.com/wren-lang/
+#if defined( _MSC_VER )
+  #define UNREACHABLE() __assume(0)
+#elif (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+  #define UNREACHABLE() __builtin_unreachable()
+#else
+  #define UNREACHABLE()
+#endif
+
+#endif // DEBUG
+
+// Allocate object of [type] using the vmRealloc function.
+#define ALLOCATE(vm, type) \
+    ((type*)vmRealloc(vm, NULL, 0, sizeof(type)))
+
+// Allocate object of [type] which has a dynamic tail array of type [tail_type]
+// with [count] entries.
+#define ALLOCATE_DYNAMIC(vm, type, count, tail_type) \
+    ((type*)vmRealloc(vm, NULL, 0, sizeof(type) + sizeof(tail_type) * (count)))
 
 #endif //MS_COMMON_H

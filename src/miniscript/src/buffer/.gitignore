@@ -1,5 +1,0 @@
-*
-!.gitignore
-!buffer.template.h
-!buffer.template.c
-!buffergen.py

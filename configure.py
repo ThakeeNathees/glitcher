@@ -32,9 +32,16 @@ def update_subdirs():
 def update_config():
 	log("updating configuration")
 	if sys.platform == 'win32':
-		with open('run.bat', 'w') as run_file:
-			run_file.write('@echo off\n"%s" --path "%s"' % (data['godot-path'],
+		with open('run.bat', 'w') as f:
+			f.write('@echo off\n"%s" --path "%s"' % (data['godot-path'],
 				os.path.join(os.getcwd(), 'MiniScript/')))
+
+		with open('src/miniscript/src/types/gen.bat', 'w') as f:
+			f.write('python buffergen.py')
+		with open('src/miniscript/src/types/clean.bat', 'w') as f:
+			f.write('python buffergen.py --clean')
+
+
 	log("configuration updated")
 	return 0
 
@@ -109,8 +116,8 @@ def check_native_bindings():
 	return 0
 
 def generate_source_files():
-	log("generating buffer source files")
-	sys.path.insert(1, 'src/miniscript/src/buffer')
+	log("generating types/buffer source files")
+	sys.path.insert(1, 'src/miniscript/src/types/')
 	import buffergen
 	return buffergen.gen()
 	log("buffer source files generated")

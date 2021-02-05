@@ -7,28 +7,29 @@
   * $name$ will be replaced by the name of the buffer and $type$ will be
   * replaced by the element type of the buffer (by a pre compile script) */
 
-/** Replace the following line with "$name$_buffer.h" */
+// Replace the following line with "$name$_buffer.h"
 #include "buffer.template.h"
-#include "../utils/utils.h"
+#include "../utils.h"
+#include "../vm.h"
 
-void ms_$name$BufferInit($name$Buffer* self) {
+void $name_l$BufferInit($name$Buffer* self) {
 	self->data = NULL;
 	self->count = 0;
 	self->capacity = 0;
 }
 
-void ms_$name$BufferClear($name$Buffer* self, VM* vm) {
-	ms_realloc(vm, self->data, self->capacity * sizeof($type$), 0);
+void $name_l$BufferClear($name$Buffer* self, VM* vm) {
+	vmRealloc(vm, self->data, self->capacity * sizeof($type$), 0);
 	self->data = NULL;
 	self->count = 0;
 	self->capacity = 0;
 }
 
-void ms_$name$BufferFill($name$Buffer* self, VM* vm, $type$ data, int count) {
+void $name_l$BufferFill($name$Buffer* self, VM* vm, $type$ data, int count) {
 	
 	if (self->capacity < self->count + count) {
-		int capacity = ms_powerOf2Ceil(self->count + count);
-		self->data = ms_realloc(vm, self->data,
+		int capacity = utilPowerOf2Ceil((int)self->count + count);
+		self->data = ($type$*)vmRealloc(vm, self->data,
 			self->capacity * sizeof($type$), capacity * sizeof($type$));
 		self->capacity = capacity;
 	}
@@ -38,6 +39,6 @@ void ms_$name$BufferFill($name$Buffer* self, VM* vm, $type$ data, int count) {
 	}
 }
 
-void ms_$name$BufferWrite($name$Buffer* self, VM* vm, $type$ data) {
-	ms_$name$BufferFill(self, vm, data, 1);
+void $name_l$BufferWrite($name$Buffer* self, VM* vm, $type$ data) {
+	$name_l$BufferFill(self, vm, data, 1);
 }

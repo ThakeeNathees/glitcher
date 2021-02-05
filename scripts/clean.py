@@ -62,7 +62,7 @@ def clean():
 	remove_all(remove_list)
 	
 	## clean generated source files
-	sys.path.insert(1, 'src/miniscript/src/buffer')
+	sys.path.insert(1, 'src/miniscript/src/types')
 	import buffergen
 	buffergen.clean()
 
