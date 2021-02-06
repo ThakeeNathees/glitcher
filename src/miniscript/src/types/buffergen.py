@@ -8,11 +8,12 @@ SCRIPT_PATH = Path(os.path.realpath(__file__))
 ROOT = str(SCRIPT_PATH.parent)
 
 GEN_LIST = [
-	## name     type         dependencies
-	('Int',     'int'),
-	('Byte',    'uint8_t'),
-	('Var',     'Var'),
-	('String',  'String*'),
+	## name       type
+	('Int',       'int'),
+	('Byte',      'uint8_t'),
+	('Var',       'Var'),
+	('String',    'String*'),
+	('Function',  'Function*'),
 ]
 
 def log(msg):

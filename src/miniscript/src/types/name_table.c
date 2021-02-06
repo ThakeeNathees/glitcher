@@ -16,11 +16,11 @@ void nameTableClear(NameTable* self, VM* vm) {
 }
 
 int nameTableAdd(NameTable* self, VM* vm, const char* name, size_t length) {
-	String* string = varNewString(vm, name, length);
+	String* string = varNewString(vm, name, (uint32_t)length);
 
 	vmPushTempRef(vm, &string->_super);
 	stringBufferWrite(self, vm, string);
 	vmPopTempRef(vm);
 
-	return self->count - 1;
+	return (int)(self->count - 1);
 }

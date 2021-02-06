@@ -30,18 +30,24 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "types/gen/byte_buffer.h"
+#include "types/gen/function_buffer.h"
+#include "types/gen/int_buffer.h"
 #include "types/gen/var_buffer.h"
 #include "types/name_table.h"
 
-/** To use dynamic variably-sized struct with a tail array add an array at the
- * end of the struct with size \ref DYNAMIC_TAIL_ARRAY. This method was a
- * legacy standard called "struct hack". */
+// To use dynamic variably-sized struct with a tail array add an array at the
+// end of the struct with size \ref DYNAMIC_TAIL_ARRAY. This method was a
+// legacy standard called "struct hack".
 #if __STDC_VERSION__ >= 199901L
   /** for std >= c99  it's just `arr[]` */
   #define DYNAMIC_TAIL_ARRAY
 #else
   #define DYNAMIC_TAIL_ARRAY 0
 #endif
+
+// Number of maximum import statements in a script.
+#define MAX_IMPORT_SCRIPTS 16
 
 /**
  * The IEEE 754 double precision float bit representation.
@@ -149,7 +155,6 @@
 #define AS_MAP(value)     ((Map*)AS_OBJ(value))
 #define AS_RANGE(value)   ((Range*)AS_OBJ(value))
 
-
 typedef uint64_t Var;
 
 #else
@@ -181,32 +186,22 @@ typedef struct {
 #endif // VAR_NAN_TAGGING
 
 typedef enum /* ObjectType */ {
-
 	OBJ_STRING,
 	OBJ_ARRAY,
 	OBJ_MAP,
 	OBJ_RANGE,
 
 	OBJ_SCRIPT,
-	OBJ_CLASS,
 	OBJ_FUNC,
 	OBJ_INSTANCE,
 
 	OBJ_USER,
 } ObjectType;
 
-typedef struct Object Object;
-typedef struct String String;
-typedef struct Array Array;
-typedef struct Range Range;
-
-typedef struct Script Script;
-typedef struct Class  Class;
-
 // Base struct for all heap allocated objects.
 struct Object {
 	ObjectType type;  //< Type of the object in \ref var_Object_Type.
-	Class* is;        //< The class the object IS.
+	//Class* is;      //< The class the object IS. // No OOP in MS.
 
 	Object* next;     //< Next object in the heap allocated link list.
 };
@@ -237,29 +232,48 @@ struct Range {
 struct Script {
 	Object _super;
 
-	VarBuffer globals;        //< Script level variables.
-	NameTable global_names; //< Name map to index in globals.
+	ID imports[MAX_IMPORT_SCRIPTS]; //< Imported script IDs.
+	int import_count;               //< Number of import in imports.
+
+	VarBuffer globals;         //< Script level global variables.
+	NameTable global_names;    //< Name map to index in globals.
+
+	FunctionBuffer functions;  //< Script level functions.
+	NameTable function_names;  //< Name map to index in functions.
+
+	// TODO: literal constants as Map.
 };
 
-struct Class {
+// To maintain simpilicity I won't implement object oriantation in MiniScript.
+//struct Class {
+//	Object _super;
+//
+//	Class* _base_class;
+//	String* name;
+//};
+
+struct Function {
 	Object _super;
 
-	Class* _base_class;
-	String* name;
-};
+	const char* name;    //< Name in the script [owner].
 
+	Script* owner;       //< Owner script of the function.
+	ByteBuffer opcodes;  //< Buffer of opcodes.
+	IntBuffer oplines;   //< Line number of opcodes for debug (1 based).
+
+	int stack_size;      //< Maximum size of stack required.
+	int arity;           //< Number of argument the function expects.
+};
 
 // Methods.
 
-void varInitObject(Object* self, VM* vm, ObjectType type, Class* is);
-
-// Type conversions.
+void varInitObject(Object* self, VM* vm, ObjectType type);
 
 // Instead use VAR_NUM(value) and AS_NUM(value)
 Var varDoubleToVar(double value);
 double varVarToDouble(Var value);
 
 // Allocate new String object and return String*.
-String* varNewString(VM* vm, const char* text, size_t length);
+String* varNewString(VM* vm, const char* text, uint32_t length);
 
 #endif // VAR_H

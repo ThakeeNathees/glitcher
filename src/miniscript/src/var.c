@@ -3,13 +3,11 @@
  *  Licensed under: MIT License
  */
 
-#include "common.h"
 #include "var.h"
 #include "vm.h"
 
-void varInitObject(Object* self, VM* vm, ObjectType type, Class* is) {
+void varInitObject(Object* self, VM* vm, ObjectType type) {
 	self->type = type;
-	self->is = is;
 	self->next = vm->first;
 	vm->first = self;
 	// TODO: set isGray = false;
@@ -44,16 +42,12 @@ static inline double varVarToDouble(Var value) {
 #endif // VAR_NAN_TAGGING
 }
 
-Var varObjectToVar(Object* obj) {
-
-}
-
-String* varNewString(VM* vm, const char* text, size_t length) {
+String* varNewString(VM* vm, const char* text, uint32_t length) {
 
 	ASSERT(length == 0 || text != NULL, "Unexpected NULL string.");
 
 	String* string = ALLOCATE_DYNAMIC(vm, String, length + 1, char);
-	varInitObject(&string->_super, vm, OBJ_STRING, vm->class_string);
+	varInitObject(&string->_super, vm, OBJ_STRING);
 	string->length = length;
 
 	if (length != 0) memcpy(string->data, text, length);
