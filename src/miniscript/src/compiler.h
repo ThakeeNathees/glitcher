@@ -11,7 +11,7 @@
 
 typedef struct Compiler Compiler;
 
-Script* compileSource(Compiler* self, VM* vm, const char* source);
+Script* compileSource(VM* vm, const char* source);
 
 
 #endif // COMPILER_H

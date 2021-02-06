@@ -22,7 +22,7 @@ typedef union {
 } _DoubleBitsConv;
 #endif
 
-Var varDoubleToVar(double value) {
+Var doubleToVar(double value) {
 #if VAR_NAN_TAGGING
 	_DoubleBitsConv bits;
 	bits.num = value;
@@ -32,7 +32,7 @@ Var varDoubleToVar(double value) {
 #endif // VAR_NAN_TAGGING
 }
 
-static inline double varVarToDouble(Var value) {
+static inline double varToDouble(Var value) {
 #if VAR_NAN_TAGGING
 	_DoubleBitsConv bits;
 	bits.bits64 = value;
@@ -42,7 +42,7 @@ static inline double varVarToDouble(Var value) {
 #endif // VAR_NAN_TAGGING
 }
 
-String* varNewString(VM* vm, const char* text, uint32_t length) {
+String* newString(VM* vm, const char* text, uint32_t length) {
 
 	ASSERT(length == 0 || text != NULL, "Unexpected NULL string.");
 
@@ -53,4 +53,44 @@ String* varNewString(VM* vm, const char* text, uint32_t length) {
 	if (length != 0) memcpy(string->data, text, length);
 	string->data[length] = '\0';
 	return string;
+}
+
+Script* newScript(VM* vm) {
+	Script* script = ALLOCATE(vm, Script);
+	varInitObject(&script->_super, vm, OBJ_SCRIPT);
+
+	varBufferInit(&script->globals);
+	nameTableInit(&script->global_names);
+
+	functionBufferInit(&script->functions);
+	nameTableInit(&script->function_names);
+	
+	return script;
+}
+
+Function* newFunction(VM* vm, const char* name, Script* owner,
+                      bool is_native) {
+
+	Function* func = ALLOCATE(vm, Function);
+	varInitObject(&func->_super, vm, OBJ_FUNC);
+
+	func->name = name;
+	func->owner = owner;
+	func->arity = -1;
+
+	func->is_native = is_native;
+
+	if (is_native) {
+		func->native = NULL;
+	} else {
+		vmPushTempRef(vm, &func->_super);
+		Fn* fn = ALLOCATE(vm, Fn);
+		vmPopTempRef(vm);
+
+		byteBufferInit(&fn->opcodes);
+		intBufferInit(&fn->oplines);
+		fn->stack_size = 0;
+		func->fn = fn;
+	}
+	return func;
 }

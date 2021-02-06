@@ -16,11 +16,16 @@ void nameTableClear(NameTable* self, VM* vm) {
 }
 
 int nameTableAdd(NameTable* self, VM* vm, const char* name, size_t length) {
-	String* string = varNewString(vm, name, (uint32_t)length);
+	String* string = newString(vm, name, (uint32_t)length);
 
 	vmPushTempRef(vm, &string->_super);
 	stringBufferWrite(self, vm, string);
 	vmPopTempRef(vm);
 
 	return (int)(self->count - 1);
+}
+
+const char* nameTableGet(NameTable* self, int index) {
+	ASSERT(0 <= index && index < self->count, "Index out of bounds.");
+	return self->data[index]->data;
 }

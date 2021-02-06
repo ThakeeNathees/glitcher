@@ -125,7 +125,7 @@
 // Encode types.
 #define VAR_BOOL(value) ((value)? VAR_TRUE : VAR_FALSE)
 #define VAR_INT(value)  (_MASK_INTEGER | (uint32_t)(int32_t)(value))
-#define VAR_NUM(value)  (varDoubleToVar(value))
+#define VAR_NUM(value)  (doubleToVar(value))
 #define VAR_OBJ(value)  ((Var)(_MASK_OBJECT | (uint64_t)(uintptr_t)(value)))
 
 // Const casting.
@@ -146,7 +146,7 @@
 // Decode types.
 #define AS_BOOL(value) ((value) == VAR_TRUE)
 #define AS_INT(value)  ((int32_t)((value) & _PAYLOAD_INTEGER))
-#define AS_NUM(value)  (varVarToDouble(value))
+#define AS_NUM(value)  (varToDouble(value))
 #define AS_OBJ(value)  ((Object*)(value & _PAYLOAD_OBJECT))
 
 #define AS_STRING(value)  ((String*)AS_OBJ(value))
@@ -252,17 +252,25 @@ struct Script {
 //	String* name;
 //};
 
+// Script function pointer.
+typedef struct {
+	ByteBuffer opcodes;  //< Buffer of opcodes.
+	IntBuffer oplines;   //< Line number of opcodes for debug (1 based).
+	int stack_size;      //< Maximum size of stack required.
+} Fn;
+
 struct Function {
 	Object _super;
 
 	const char* name;    //< Name in the script [owner].
-
 	Script* owner;       //< Owner script of the function.
-	ByteBuffer opcodes;  //< Buffer of opcodes.
-	IntBuffer oplines;   //< Line number of opcodes for debug (1 based).
-
-	int stack_size;      //< Maximum size of stack required.
 	int arity;           //< Number of argument the function expects.
+
+	bool is_native;      //< True if Native function.
+	union {
+		MiniScriptNativeFn native;  //< Native function pointer.
+		Fn* fn;                     //< Script function pointer.
+	};
 };
 
 // Methods.
@@ -270,10 +278,18 @@ struct Function {
 void varInitObject(Object* self, VM* vm, ObjectType type);
 
 // Instead use VAR_NUM(value) and AS_NUM(value)
-Var varDoubleToVar(double value);
-double varVarToDouble(Var value);
+Var doubleToVar(double value);
+double varToDouble(Var value);
 
 // Allocate new String object and return String*.
-String* varNewString(VM* vm, const char* text, uint32_t length);
+String* newString(VM* vm, const char* text, uint32_t length);
+
+// Allocate new Script object and return Script*.
+Script* newScript(VM* vm);
+
+// Allocate new Function object and return Function*. Parameter [name] should
+// be the name in the Script's nametable.
+Function* newFunction(VM* vm, const char* name, Script* owner, bool is_native);
+
 
 #endif // VAR_H

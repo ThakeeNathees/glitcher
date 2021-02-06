@@ -7,6 +7,7 @@
 #define VM_H
 
 #include "common.h"
+#include "compiler.h"
 #include "var.h"
 
 // The maximum number of temporary object reference to protect them from being
@@ -24,6 +25,9 @@ struct VM {
 	// doesn't garbage collected.
 	Object* temp_reference[MAX_TEMP_REFERENCE];
 	int temp_reference_count;
+
+	// current compiler reference to mark it's heap allocated objects.
+	Compiler* compiler;
 };
 
 // A realloc wrapper which handles memory allocations of the VM.

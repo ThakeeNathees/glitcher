@@ -5,8 +5,10 @@
 
 #include "compiler.h"
 
+#include "types/name_table.h"
 #include "types/gen/byte_buffer.h"
 #include "utils.h"
+#include "vm.h"
 
 // The maximum number of variables (or global if compiling top level script) 
 // to lookup from the compiling context. Also it's limited by it's opcode 
@@ -69,10 +71,11 @@ typedef enum {
 	//TK_XOREQ,      // ^=
 
 	// Keywords.
-	//TK_TYPE,       // type
+	//TK_TYPE,     // type
+	TK_IMPORT,     // import
 	TK_ENUM,       // enum
 	TK_DEF,        // def
-	TK_EXTERN,     // extern (C function declaration)
+	TK_NATIVE,     // native (C function declaration)
 	TK_END,        // end
 
 	TK_NULL,       // null
@@ -96,6 +99,7 @@ typedef enum {
 	TK_FUNC_T,    // Function 
 	TK_OBJ_T,     // Object (self, user data, etc.)
 
+	TK_DO,         // do
 	TK_WHILE,      // while
 	TK_FOR,        // for
 	TK_IF,         // if
@@ -134,43 +138,46 @@ typedef struct {
 
 typedef struct {
 	const char* identifier;
+	int length;
 	TokenType tk_type;
 } _Keyword;
 
 // List of keywords mapped into their identifiers.
 static _Keyword _keywords[] = {
-	//{ "type",     TK_TYPE },
-	{ "enum",     TK_ENUM },
-	{ "def",      TK_DEF },
-	{ "extern",   TK_EXTERN },
-	{ "end",      TK_END },
-	{ "null",     TK_NULL },
-	{ "self",     TK_SELF },
-	{ "is",       TK_IS },
-	{ "in",       TK_IN },
-	{ "and",      TK_AND },
-	{ "or",       TK_OR },
-	{ "not",      TK_NOT },
-	{ "true",     TK_TRUE },
-	{ "false",    TK_FALSE },
-	{ "while",    TK_WHILE },
-	{ "for",      TK_FOR },
-	{ "if",       TK_IF },
-	{ "elif",     TK_ELIF },
-	{ "else",     TK_ELSE },
-	{ "break",    TK_BREAK },
-	{ "continue", TK_CONTINUE },
-	{ "return",   TK_RETURN },
+	//{ "type",   4, TK_TYPE },
+	{ "import",   6,  TK_IMPORT },
+	{ "enum",     4,  TK_ENUM },
+	{ "def",      3,  TK_DEF },
+	{ "native",   6,  TK_NATIVE },
+	{ "end",      3,  TK_END },
+	{ "null",     4, TK_NULL },
+	{ "self",     4, TK_SELF },
+	{ "is",       2, TK_IS },
+	{ "in",       2, TK_IN },
+	{ "and",      3, TK_AND },
+	{ "or",       2, TK_OR },
+	{ "not",      3, TK_NOT },
+	{ "true",     4, TK_TRUE },
+	{ "false",    5, TK_FALSE },
+	{ "do",       2, TK_DO },
+	{ "while",    5, TK_WHILE },
+	{ "for",      3, TK_FOR },
+	{ "if",       2, TK_IF },
+	{ "elif",     4, TK_ELIF },
+	{ "else",     4, TK_ELSE },
+	{ "break",    5, TK_BREAK },
+	{ "continue", 8, TK_CONTINUE },
+	{ "return",   6, TK_RETURN },
 
 	// Type names.
-	{ "Bool",     TK_BOOL_T },
-	{ "Num",      TK_NUM_T },
-	{ "String",   TK_STRING_T },
-	{ "Array",    TK_ARRAY_T },
-	{ "Map",      TK_MAP_T },
-	{ "Range",    TK_RANGE_T },
-	{ "Object",   TK_OBJ_T },
-	{ "Function", TK_FUNC_T },
+	{ "Bool",     4, TK_BOOL_T },
+	{ "Num",      3, TK_NUM_T },
+	{ "String",   6, TK_STRING_T },
+	{ "Array",    5, TK_ARRAY_T },
+	{ "Map",      3, TK_MAP_T },
+	{ "Range",    5, TK_RANGE_T },
+	{ "Object",   6, TK_OBJ_T },
+	{ "Function", 8, TK_FUNC_T },
 
 	{ NULL,      (TokenType)(0) }, // Sentinal to mark the end of the array
 };
@@ -190,8 +197,6 @@ typedef struct {
 } Parser;
 
 // Compiler Types ////////////////////////////////////////////////////////////
-
-typedef struct Compiler Compiler;
 
 // Precedence parsing references:
 // https://en.wikipedia.org/wiki/Shunting-yard_algorithm
@@ -258,6 +263,7 @@ typedef struct sLoop {
 
 struct Compiler {
 
+	VM* vm;
 	Parser parser;
 
 	// Current depth the compiler in (-1 means top level) 0 means function
@@ -265,11 +271,13 @@ struct Compiler {
 	int scope_depth;
 
 	Variable variables[MAX_VARIABLES]; //< Variables in the current context.
-	int locals_count;                  //< Number of locals in [variables].
+	int var_count;                     //< Number of locals in [variables].
 
-	Loop* loop;   //< Current loop.
-	Function* fn; //< Current function.
+	// TODO: compiler should mark Script* below not to be garbage collected.
 
+	Script* script; //< Current script.
+	Loop* loop;     //< Current loop.
+	Function* fn;   //< Current function.
 };
 
 /*****************************************************************************
@@ -282,6 +290,7 @@ static char eatChar(Parser* parser);
 static void setNextValueToken(Parser* parser, TokenType type, Var value);
 static void setNextToken(Parser* parser, TokenType type);
 static bool matchChar(Parser* parser, char c);
+static bool matchLine(Parser* parser);
 
 static void eatString(Parser* parser) {
 	ByteBuffer buff;
@@ -318,7 +327,7 @@ static void eatString(Parser* parser) {
 	}
 
 	// '\0' will be added by varNewSring();
-	Var string = VAR_OBJ(&varNewString(parser->vm, (const char*)buff.data,
+	Var string = VAR_OBJ(&newString(parser->vm, (const char*)buff.data,
 		(uint32_t)buff.count)->_super);
 
 	byteBufferClear(&buff, parser->vm);
@@ -360,7 +369,8 @@ static void eatName(Parser* parser) {
 
 	int length = (int)(parser->current_char - name_start);
 	for (int i = 0; _keywords[i].identifier != NULL; i++) {
-		if (strncmp(name_start, _keywords[i].identifier, length) == 0) {
+		if (_keywords[i].length == length &&
+			strncmp(name_start, _keywords[i].identifier, length) == 0) {
 			type = _keywords[i].tk_type;
 			break;
 		}
@@ -393,6 +403,11 @@ static void skipLineComment(Parser* parser) {
 	while (c != '\n' && c != '\0') {
 		c = eatChar(parser);
 	}
+}
+
+// Will skip multiple new lines.
+static void skipNewLines(Parser* parser) {
+	matchLine(parser);
 }
 
 // If the current char is [c] consume it and advance char by 1 and returns
@@ -428,8 +443,8 @@ static void setNextValueToken(Parser* parser, TokenType type, Var value) {
 	parser->next.value = value;
 }
 
-// lexToken function's internal method.
-static void _lexToken_internal(Parser* parser) {
+// Lex the next token and set it as the next token.
+static void lexToken(Parser* parser) {
 	parser->previous = parser->current;
 	parser->current = parser->next;
 
@@ -517,7 +532,7 @@ static void _lexToken_internal(Parser* parser) {
 			default: {
 
 				if (utilIsDigit(c)) {
-					// TODO:
+					eatNumber(parser);
 				} else if (utilIsName(c)) {
 					eatName(parser);
 				} else {
@@ -537,24 +552,16 @@ static void _lexToken_internal(Parser* parser) {
 	parser->next.start = parser->current_char;
 }
 
-// Lex the next token and set it as the next token and returns the current
-// token which will be the previous token after lexToken().
-static TokenType lexToken(Parser* parser) {
-	_lexToken_internal(parser);
-	return parser->previous.type;
-}
-
-
 /*****************************************************************************
  * PARSING                                                                   *
  *****************************************************************************/
 
  // Initialize the parser.
-static void parserInit(Parser* self) {
-	self->vm = NULL;
-	self->source = NULL;
-	self->token_start = NULL;
-	self->current_char = NULL;
+static void parserInit(Parser* self, VM* vm, const char* source) {
+	self->vm = vm;
+	self->source = source;
+	self->token_start = source;
+	self->current_char = source;
 	self->current_line = 1;
 	self->has_errors = false;
 
@@ -576,17 +583,54 @@ static TokenType peekNext(Parser* self) {
 }
 
 // Consume the current token if it's expected and lex for the next token
-// and return true otherwise reutrn false.
+// and return true otherwise reutrn false. It'll skips all the new lines
+// inbetween thus matching TK_LINE is invalid.
 static bool match(Parser* self, TokenType expected) {
+	ASSERT(expected != TK_LINE, "Can't match TK_LINE.");
+	matchLine(self);
+
 	if (peek(self) != expected) return false;
 	lexToken(self);
 	return true;
 }
 
+// Match one or more lines and return true if there any.
+static bool matchLine(Parser* parser) {
+	if (peek(parser) != TK_LINE) return false;
+	while (peek(parser) == TK_LINE)
+		lexToken(parser);
+	return true;
+}
+
+// Match semi collon or multiple new lines.
+static void matchEndStatement(Parser* parser) {
+
+	// Semi collon must be on the same line.
+	if (peek(parser) == TK_SEMICOLLON)
+		match(parser, TK_SEMICOLLON);
+
+	matchLine(parser);
+}
+
+// Match optional "do" keyword and new lines.
+static void matchStartBlock(Parser* parser) {
+
+	// "do" must be on the same line.
+	if (peek(parser) == TK_DO)
+		match(parser, TK_DO);
+
+	matchLine(parser);
+}
+
 // Consume the the current token and if it's not [expected] emits error log
-// and continue parsing for more error logs.
-static void eatToken(Parser* self, TokenType expected, const char* err_msg) {
-	if (lexToken(self) != expected) {
+// and continue parsing for more error logs. It'll skips all the new lines
+// inbetween thus matching TK_LINE is invald.
+static void consume(Parser* self, TokenType expected, const char* err_msg) {
+	ASSERT(expected != TK_LINE, "Can't match TK_LINE.");
+	matchLine(self);
+
+	lexToken(self);
+	if (self->previous.type != expected) {
 		// TODO: syntaxError(err_msg);
 
 		// If the next token is expected discard the current to minimize
@@ -625,75 +669,77 @@ static void exprSubscript(Compiler* compiler, bool can_assign);
 #define NO_INFIX PREC_NONE
 
 GrammarRule rules[] = {  // Prefix       Infix             Infix Precedence
-	/* TK_ERROR		 */   NO_RULE,
-	/* TK_EOF		 */   NO_RULE,
-	/* TK_LINE		 */   NO_RULE,
-	/* TK_DOT		 */ { exprAttrib,    NULL,             PREC_ATTRIB },
-	/* TK_DOTDOT	 */ { NULL,          exprBinaryOp,     PREC_RANGE },
-	/* TK_COMMA		 */   NO_RULE,
-	/* TK_COLLON	 */   NO_RULE,
+	/* TK_ERROR      */   NO_RULE,
+	/* TK_EOF        */   NO_RULE,
+	/* TK_LINE       */   NO_RULE,
+	/* TK_DOT        */ { exprAttrib,    NULL,             PREC_ATTRIB },
+	/* TK_DOTDOT     */ { NULL,          exprBinaryOp,     PREC_RANGE },
+	/* TK_COMMA      */   NO_RULE,
+	/* TK_COLLON     */   NO_RULE,
 	/* TK_SEMICOLLON */   NO_RULE,
-	/* TK_HASH		 */   NO_RULE,
-	/* TK_LPARAN	 */ { exprGrouping,  exprCall,         PREC_CALL },
-	/* TK_RPARAN	 */   NO_RULE,
-	/* TK_LBRACKET	 */ { exprArray,     exprSubscript,    PREC_SUBSCRIPT },
-	/* TK_RBRACKET	 */   NO_RULE,
-	/* TK_LBRACE	 */ { exprMap,       NULL,             NO_INFIX },
-	/* TK_RBRACE	 */   NO_RULE,
-	/* TK_PERCENT	 */ { NULL,          exprBinaryOp,     PREC_FACTOR },
-	/* TK_TILD		 */ { exprUnaryOp,   NULL,             NO_INFIX },
-	/* TK_AMP		 */ { NULL,          exprBinaryOp,     PREC_BITWISE_AND },
-	/* TK_PIPE		 */ { NULL,          exprBinaryOp,     PREC_BITWISE_OR },
-	/* TK_CARET		 */ { NULL,          exprBinaryOp,     PREC_BITWISE_XOR },
-	/* TK_PLUS		 */ { NULL,          exprBinaryOp,     PREC_TERM },
-	/* TK_MINUS		 */ { NULL,          exprBinaryOp,     PREC_TERM },
-	/* TK_STAR		 */ { NULL,          exprBinaryOp,     PREC_FACTOR },
-	/* TK_FSLASH	 */ { NULL,          exprBinaryOp,     PREC_FACTOR },
-	/* TK_BSLASH	 */   NO_RULE,
-	/* TK_EQ		 */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
-	/* TK_GT		 */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
-	/* TK_LT		 */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
-	/* TK_EQEQ		 */ { NULL,          exprBinaryOp,     PREC_EQUALITY },
-	/* TK_NOTEQ		 */ { NULL,          exprBinaryOp,     PREC_EQUALITY },
-	/* TK_GTEQ		 */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
-	/* TK_LTEQ		 */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
-	/* TK_PLUSEQ	 */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
-	/* TK_MINUSEQ	 */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
-	/* TK_STAREQ	 */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
-	/* TK_DIVEQ		 */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
-	/* TK_SRIGHT	 */ { NULL,          exprBinaryOp,     PREC_BITWISE_SHIFT },
-	/* TK_SLEFT		 */ { NULL,          exprBinaryOp,     PREC_BITWISE_SHIFT },
-	/* TK_ENUM		 */   NO_RULE,
-	/* TK_DEF		 */   NO_RULE,
-	/* TK_EXTERN	 */   NO_RULE,
-	/* TK_END		 */   NO_RULE,
-	/* TK_NULL		 */   NO_RULE,
-	/* TK_SELF		 */   NO_RULE,
-	/* TK_IS		 */ { NULL,          exprBinaryOp,     PREC_IS },
-	/* TK_IN		 */ { NULL,          exprBinaryOp,     PREC_IN },
-	/* TK_AND		 */ { NULL,          exprBinaryOp,     PREC_LOGICAL_AND },
-	/* TK_OR		 */ { NULL,          exprBinaryOp,     PREC_LOGICAL_OR },
-	/* TK_NOT		 */ { NULL,          exprUnaryOp,      PREC_LOGICAL_NOT },
-	/* TK_TRUE		 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_FALSE		 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_BOOL_T	 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_NUM_T		 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_STRING_T	 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_ARRAY_T	 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_MAP_T		 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_RANGE_T	 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_FUNC_T	 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_OBJ_T		 */ { exprLiteral,   NULL,             NO_INFIX },
-	/* TK_WHILE		 */   NO_RULE,
-	/* TK_FOR		 */   NO_RULE,
-	/* TK_IF		 */   NO_RULE,
-	/* TK_ELIF		 */   NO_RULE,
-	/* TK_ELSE		 */   NO_RULE,
-	/* TK_BREAK		 */   NO_RULE,
-	/* TK_CONTINUE	 */   NO_RULE,
-	/* TK_RETURN	 */   NO_RULE,
-	/* TK_NAME		 */ { exprName,      NULL,             NO_INFIX },
-	/* TK_NUMBER	 */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_HASH       */   NO_RULE,
+	/* TK_LPARAN     */ { exprGrouping,  exprCall,         PREC_CALL },
+	/* TK_RPARAN     */   NO_RULE,
+	/* TK_LBRACKET   */ { exprArray,     exprSubscript,    PREC_SUBSCRIPT },
+	/* TK_RBRACKET   */   NO_RULE,
+	/* TK_LBRACE     */ { exprMap,       NULL,             NO_INFIX },
+	/* TK_RBRACE     */   NO_RULE,
+	/* TK_PERCENT    */ { NULL,          exprBinaryOp,     PREC_FACTOR },
+	/* TK_TILD       */ { exprUnaryOp,   NULL,             NO_INFIX },
+	/* TK_AMP        */ { NULL,          exprBinaryOp,     PREC_BITWISE_AND },
+	/* TK_PIPE       */ { NULL,          exprBinaryOp,     PREC_BITWISE_OR },
+	/* TK_CARET      */ { NULL,          exprBinaryOp,     PREC_BITWISE_XOR },
+	/* TK_PLUS       */ { NULL,          exprBinaryOp,     PREC_TERM },
+	/* TK_MINUS      */ { NULL,          exprBinaryOp,     PREC_TERM },
+	/* TK_STAR       */ { NULL,          exprBinaryOp,     PREC_FACTOR },
+	/* TK_FSLASH     */ { NULL,          exprBinaryOp,     PREC_FACTOR },
+	/* TK_BSLASH     */   NO_RULE,
+	/* TK_EQ         */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
+	/* TK_GT         */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
+	/* TK_LT         */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
+	/* TK_EQEQ       */ { NULL,          exprBinaryOp,     PREC_EQUALITY },
+	/* TK_NOTEQ      */ { NULL,          exprBinaryOp,     PREC_EQUALITY },
+	/* TK_GTEQ       */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
+	/* TK_LTEQ       */ { NULL,          exprBinaryOp,     PREC_COMPARISION },
+	/* TK_PLUSEQ     */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
+	/* TK_MINUSEQ    */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
+	/* TK_STAREQ     */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
+	/* TK_DIVEQ      */ { NULL,          exprAssignment,   PREC_ASSIGNMENT },
+	/* TK_SRIGHT     */ { NULL,          exprBinaryOp,     PREC_BITWISE_SHIFT },
+	/* TK_SLEFT      */ { NULL,          exprBinaryOp,     PREC_BITWISE_SHIFT },
+	/* TK_IMPORT     */   NO_RULE,
+	/* TK_ENUM       */   NO_RULE,
+	/* TK_DEF        */   NO_RULE,
+	/* TK_EXTERN     */   NO_RULE,
+	/* TK_END        */   NO_RULE,
+	/* TK_NULL       */   NO_RULE,
+	/* TK_SELF       */   NO_RULE,
+	/* TK_IS         */ { NULL,          exprBinaryOp,     PREC_IS },
+	/* TK_IN         */ { NULL,          exprBinaryOp,     PREC_IN },
+	/* TK_AND        */ { NULL,          exprBinaryOp,     PREC_LOGICAL_AND },
+	/* TK_OR         */ { NULL,          exprBinaryOp,     PREC_LOGICAL_OR },
+	/* TK_NOT        */ { NULL,          exprUnaryOp,      PREC_LOGICAL_NOT },
+	/* TK_TRUE       */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_FALSE      */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_BOOL_T     */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_NUM_T      */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_STRING_T   */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_ARRAY_T    */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_MAP_T      */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_RANGE_T    */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_FUNC_T     */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_OBJ_T      */ { exprLiteral,   NULL,             NO_INFIX },
+	/* TK_DO         */   NO_RULE,
+	/* TK_WHILE      */   NO_RULE,
+	/* TK_FOR        */   NO_RULE,
+	/* TK_IF         */   NO_RULE,
+	/* TK_ELIF       */   NO_RULE,
+	/* TK_ELSE       */   NO_RULE,
+	/* TK_BREAK      */   NO_RULE,
+	/* TK_CONTINUE   */   NO_RULE,
+	/* TK_RETURN     */   NO_RULE,
+	/* TK_NAME       */ { exprName,      NULL,             NO_INFIX },
+	/* TK_NUMBER     */ { exprLiteral,   NULL,             NO_INFIX },
 	/* TK_STRING     */ { exprLiteral,   NULL,             NO_INFIX },
 };
 
@@ -723,3 +769,177 @@ static void exprSubscript(Compiler* compiler, bool can_assign) { /*TODO*/ }
  * COMPILING                                                                 *
  *****************************************************************************/
 
+// Used in searching for local variables.
+typedef enum {
+	SCOPE_ANY = -3,
+	SCOPE_CURRENT,
+} ScopeType;
+
+// Result type for an identifier definition.
+typedef enum {
+	NAME_NOT_DEFINED,
+	NAME_LOCAL_VAR, //< Including parameter.
+	NAME_GLOBAL_VAR,
+	NAME_SCRIPT_FN,
+} NameDefnType;
+
+// Identifier search result.
+typedef struct {
+
+	NameDefnType type;
+
+	// Could be found in one of the imported script or in it's imported script
+	// recursively. If true [_extern] will be the script ID.
+	bool is_extern;
+
+	// Extern script's ID.
+	ID _extern;
+
+	union {
+		int local;
+		int global;
+		int func;
+	} index;
+
+} NameSearchResult;
+
+static void compilerInit(Compiler* compiler, VM* vm, const char* source) {
+	parserInit(&compiler->parser, vm, source);
+	compiler->vm = vm;
+	compiler->scope_depth = -1;
+	compiler->var_count = 0;
+	Loop* loop = NULL;
+	Function* fn = NULL;
+}
+
+// Search for the name through compiler's variables. Returns -1 if not found.
+static int compilerSearchVariables(Compiler* compiler, const char* name,
+                                   int length, ScopeType scope) {
+
+	for (int i = 0; i < compiler->var_count; i++) {
+		Variable* variable = &compiler->variables[i];
+		if (scope == SCOPE_CURRENT &&
+			compiler->scope_depth != variable->depth) {
+			continue;
+		}
+		if (variable->length == length &&
+			strncmp(variable->name, name, length) == 0) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+// Will check if the name already defined.
+static NameSearchResult compilerSearchName(Compiler* compiler,
+                                           const char* name, int length) {
+	// TODO:
+	NameSearchResult result;
+	result.type = NAME_NOT_DEFINED;
+	return result;
+}
+
+// Add a variable and return it's index to the context. Assumes that the
+// variable name is unique and not defined before in the current scope.
+static int compilerAddVariable(Compiler* compiler, const char* name,
+                                int length) {
+	Variable* variable = &compiler->variables[compiler->var_count];
+	variable->name = name;
+	variable->length = length;
+	variable->depth = compiler->scope_depth;
+	return compiler->var_count++;
+}
+
+static void compileFunction(Compiler* compiler, bool is_native) {
+
+	Parser* parser = &compiler->parser;
+
+	consume(&compiler->parser, TK_NAME, "Expected a function name.");
+
+	const char* name_start = parser->previous.start;
+	int name_length = parser->previous.length;
+	NameSearchResult result = compilerSearchName(compiler, name_start,
+		name_length);
+
+	if (result.type != NAME_NOT_DEFINED) {
+		// TODO: multiple definition error();
+	}
+
+	int index = nameTableAdd(&compiler->script->function_names, compiler->vm,
+		name_start, name_length);
+
+	Function* func = newFunction(compiler->vm, nameTableGet(
+		&compiler->script->function_names, index), compiler->script, is_native);
+
+	vmPushTempRef(compiler->vm, &func->_super);
+	functionBufferWrite(&compiler->script->functions, compiler->vm, func);
+	vmPopTempRef(compiler->vm);
+
+	compiler->fn = func;
+
+	consume(parser, TK_LPARAN, "Expected '(' after function name.");
+
+	compiler->scope_depth++; // Parameter scope.
+
+	// Compile parameter list.
+	while (match(parser, TK_NAME)) {
+		int predef = compilerSearchVariables(compiler, parser->previous.start,
+			parser->previous.length, SCOPE_CURRENT);
+		if (predef != -1) {
+			// TODO: error("Multiple definition of a parameter");
+		}
+		match(parser, TK_COMMA);
+	}
+
+	consume(parser, TK_RPARAN, "Expected ')' after parameters end.");
+	matchEndStatement(parser);
+
+	if (is_native) { // Done here.
+		compiler->scope_depth--; // Parameter scope.
+		compiler->fn = NULL;
+		return;
+	}
+
+	// TODO: Compile body.
+
+	compiler->scope_depth--; // Parameter scope.
+	compiler->fn = NULL;
+}
+
+Script* compileSource(VM* vm, const char* source) {
+
+	// Skip utf8 BOM if there is any.
+	if (strncmp(source, "\xEF\xBB\xBF", 3) == 0) source += 3;
+
+	Compiler compiler;
+	compilerInit(&compiler, vm, source);
+
+	Script* script = newScript(vm);
+	compiler.script = script;
+
+	// Parser pointer for quick access.
+	Parser* parser = &compiler.parser;
+
+	// Lex initial tokens. current <-- next.
+	lexToken(parser);
+	lexToken(parser);
+	skipNewLines(parser);
+
+	while (!match(parser, TK_EOF)) {
+		
+		if (match(parser, TK_NATIVE)) {
+			compileFunction(&compiler, true);
+
+		} else if (match(parser, TK_DEF)) {
+			compileFunction(&compiler, false);
+
+		} else if (match(parser, TK_IMPORT)) {
+			// TODO:
+
+		} else {
+			// name = value # Variable defn.
+			// name()       # statement
+		}
+	}
+}

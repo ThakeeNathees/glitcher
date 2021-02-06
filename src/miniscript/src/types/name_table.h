@@ -21,4 +21,7 @@ void nameTableClear(NameTable* self, VM* vm);
 // Add a name to the name table and return the index of the name in the table.
 int nameTableAdd(NameTable* self, VM* vm, const char* name, size_t length);
 
+// Return name at index.
+const char* nameTableGet(NameTable* self, int index);
+
 #endif // SYMBOL_TABLE_H

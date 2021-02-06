@@ -42,11 +42,13 @@ int main() {
 	byteBufferWrite(&buff, vm, 'b');
 	byteBufferWrite(&buff, vm, 'c');
 
-	String* str = varNewString(vm, (const char*)buff.data, 3);
+	String* str = newString(vm, (const char*)buff.data, 3);
 	Var vstr = VAR_OBJ(&str->_super);
 	if (strcmp(AS_CSTRING(vstr), "abc") != 0) {
 		clogger_logfError("[Error] something went wrong.\n");
 	}
+
+	compileSource(vm, "native someNativeFn(a, b, c);\n");
 
 	return 0;
 }
