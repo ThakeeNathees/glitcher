@@ -17,19 +17,14 @@
 // String representation of the value.
 #define MS_VERSION_STRING "0.1.0"
 
+// MiniScript Virtual Machine.
+// it'll contain the state of the execution, stack, heap, and manage memory
+// allocations.
 typedef struct VM VM;
-typedef struct String String;
 
-// Nan-Tagging could be disable for debugging/portability purposes.
-// To disable define `VAR_NAN_TAGGING 0`, otherwise it defaults to Nan-Tagging.
-#ifndef VAR_NAN_TAGGING
-  #define VAR_NAN_TAGGING 1
-#endif
+// C function pointer which is callable from MiniScript.
+typedef void (*MiniScriptNativeFn)(VM* vm);
 
-#if VAR_NAN_TAGGING
-typedef uint64_t Var;
-#else
-typedef struct Var Var;
-#endif
+
 
 #endif // MINISCRIPT_H

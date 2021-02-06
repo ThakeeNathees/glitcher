@@ -7,7 +7,6 @@
 #define VM_H
 
 #include "common.h"
-#include "miniscript.h"
 #include "var.h"
 
 // The maximum number of temporary object reference to protect them from being
@@ -15,19 +14,6 @@
 #define MAX_TEMP_REFERENCE 8
 
 struct VM {
-
-	// Native class instances.
-	Class* class_null;
-	Class* class_bool;
-	Class* class_num;
-
-	Class* class_string;
-	Class* class_array;
-	Class* class_map;
-	Class* class_range;
-
-	Class* class_object;
-	Class* class_class;
 
 	// The first object in the link list of all heap allocated objects.
 	Object* first;

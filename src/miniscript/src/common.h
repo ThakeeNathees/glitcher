@@ -36,6 +36,30 @@
   #define MS_PUBLIC
 #endif
 
+// Unique number to identify for various cases.
+typedef uint32_t ID;
+
+// Nan-Tagging could be disable for debugging/portability purposes.
+// To disable define `VAR_NAN_TAGGING 0`, otherwise it defaults to Nan-Tagging.
+#ifndef VAR_NAN_TAGGING
+  #define VAR_NAN_TAGGING 1
+#endif
+
+#if VAR_NAN_TAGGING
+typedef uint64_t Var;
+#else
+typedef struct Var Var;
+#endif
+
+typedef struct Object Object;
+typedef struct String String;
+typedef struct Array Array;
+typedef struct Range Range;
+
+typedef struct Script Script;
+//typedef struct Class Class;
+typedef struct Function Function;
+
 #ifdef DEBUG
 
 #include <stdio.h>
