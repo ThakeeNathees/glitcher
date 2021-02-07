@@ -10,7 +10,6 @@ data = {
 def main():
 	ec = check_submodule_init()
 	ec = check_native_bindings()
-	ec = generate_source_files()
 	ec = update_subdirs()
 	ec = check_config_file()
 	ec = update_config()
@@ -34,12 +33,7 @@ def update_config():
 	if sys.platform == 'win32':
 		with open('run.bat', 'w') as f:
 			f.write('@echo off\n"%s" --path "%s"' % (data['godot-path'],
-				os.path.join(os.getcwd(), 'MiniScript/')))
-
-		with open('src/miniscript/src/types/gen.bat', 'w') as f:
-			f.write('python buffergen.py')
-		with open('src/miniscript/src/types/clean.bat', 'w') as f:
-			f.write('python buffergen.py --clean')
+				os.path.join(os.getcwd(), 'Glitcher/')))
 
 
 	log("configuration updated")
@@ -115,12 +109,6 @@ def check_native_bindings():
 	log("native bindings found")
 	return 0
 
-def generate_source_files():
-	log("generating types/buffer source files")
-	sys.path.insert(1, 'src/miniscript/src/types/')
-	import buffergen
-	return buffergen.gen()
-	log("buffer source files generated")
 
 if __name__ == '__main__':
 	main()

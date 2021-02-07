@@ -2,20 +2,18 @@ Import('env')
 import os
 
 ## only for ide
-env.ALL_SOURCES = [] ## source files
-env.ALL_HEADERS = [] ## include dirs
-env.PROJECT_NAME = "MiniScript"
+env.PROJECT_NAME = "Glitcher"
 
-## compile the miniscript vm first
-SConscript('src/miniscript/SConscript')
-
-def target_path(name):
-	return os.path.join('bin/', name)
-	
 ## ide debug run target
 env.RUN_TARGET = 'Godot 3.2.2.exe --path MiniScript'
 if env['platform'] == 'windows':
 	env.RUN_TARGET = 'run.bat'
+	
+## compile the miniscript vm first
+##SConscript('src/miniscript/SConscript')
+
+def target_path(name):
+	return os.path.join('bin/', name)
 
 ## include directories
 CPPPATH = [
@@ -36,7 +34,7 @@ LIBS = [
 	env['bits'], ## TODO: -> 32, 64, default,... "arch_suffix",
 	env['LIBSUFFIX']),
 
-	'miniscript',
+	#'miniscript',
 ]
 
 ## lib sources
@@ -51,22 +49,6 @@ library = env.SharedLibrary(
 	LIBPATH = LIBPATH,
 	LIBS    = LIBS,
 )
-
-## FIXME:
-## collect ide sources
-env.ALL_SOURCES += SOURCES + [
-	Glob("#src/godot-cpp/src/core/*.cpp"),
-	Glob("#src/godot-cpp/src/gen/*.cpp"),
-	Glob("#src/miniscript/src/*.c"),
-	Glob("#src/miniscript/test/*.c"),
-	Glob("#src/test/*.cpp"),
-	
-]
-env.ALL_HEADERS += CPPPATH + [
-	'src/miniscript/src/',
-	'src/miniscript/test/',
-	'src/test/',
-]
 
 ## copy compiled binar to gdnative
 #from shutil import copyfile

@@ -1,9 +1,9 @@
 
-# MiniScript ignore list
+# Glitcher ignore list
 build/
-MiniScript/test/
+Glitcher/test/
 src/test/
-MiniScript/.import/
+Glitcher/.import/
 release/
 debug/
 *__pycache__/

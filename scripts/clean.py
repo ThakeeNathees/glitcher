@@ -48,10 +48,10 @@ def clean():
 			## dirs
 			'build/', 'x64/', 'debug/', '.vs/', 
 			## files
-			'MiniScript.sln',
-			'MiniScript.vcxproj',
-			'MiniScript.vcxproj.filters',
-			'MiniScript.vcxproj.user',
+			'Glitcher.sln',
+			'Glitcher.vcxproj',
+			'Glitcher.vcxproj.filters',
+			'Glitcher.vcxproj.user',
 			'run.bat',
 		]
 		
