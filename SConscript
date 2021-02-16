@@ -1,5 +1,12 @@
 Import('env')
 import os
+import json
+
+CONFIG_PATH = str(File('#config.json'))
+if not os.path.exists(CONFIG_PATH):
+	print(CONFIG_PATH)
+	print('Error: run configure.py before building.')
+	exit(1)
 
 ## only for ide
 env.PROJECT_NAME = "Glitcher"
@@ -21,12 +28,15 @@ CPPPATH = [
 	Dir('#src/godot-cpp/include/'),
 	Dir('#src/godot-cpp/include/core/'),
 	Dir('#src/godot-cpp/include/gen/'),
+	Dir('#src/miniscript/include/'),
 ]
+env.Append(CPPPATH=CPPPATH)
 
 LIBPATH = [ 
 	Dir("#src/godot-cpp/bin/"),
-	Dir("src/miniscript/bin/"),
+	Dir("#src/miniscript/" + env['variant_dir'] + 'bin/'),
 ]
+
 LIBS = [
 	'libgodot-cpp.{}.{}.{}{}'.format(
 	env['platform'],
@@ -34,16 +44,16 @@ LIBS = [
 	env['bits'], ## TODO: -> 32, 64, default,... "arch_suffix",
 	env['LIBSUFFIX']),
 
-	#'miniscript',
+	'miniscript',
 ]
 
 ## lib sources
 SOURCES = [
-	Glob("src/test/*.cpp"),
+	Glob("src/*.cpp"),
 ]
 
 library = env.SharedLibrary(
-	target  = "bin/testlib",
+	target  = "bin/libms",
 	source  = SOURCES,
 	CPPPATH = CPPPATH,
 	LIBPATH = LIBPATH,
@@ -51,9 +61,10 @@ library = env.SharedLibrary(
 )
 
 ## copy compiled binar to gdnative
-#from shutil import copyfile
-#if env['platform'] == 'windows':
-#	copyfile("bin/testlib.dll",
-#		str(File("#MiniScript/test/bin/testlib.dll")))
+##from shutil import copyfile
+##if env['platform'] == 'windows':
+##	copyfile("bin/testlib.dll",
+##		str(File("#Glitcher/test/bin/testlib.dll")))
+##	print('Lib copied.')
 	
 	

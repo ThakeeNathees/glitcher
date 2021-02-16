@@ -1,6 +1,9 @@
 import os, sys
 import json
 
+## To sync submodule:
+## git submodule update --remote -- src/miniscript
+
 CONFIG_FILE = 'config.json'
 
 data = {
@@ -70,44 +73,56 @@ def check_submodule_init():
 		if ec == 0:
 			log('submodules updated successfully')
 		return ec
+	## TODO: update miniscript.
 	log("submodules found")
 	return 0
 
 def check_native_bindings():
 	log("checking native bindings")
+	platform = ''
+	jobs = '-j6'
+	bits = None
+	
+	if sys.platform == 'win32':
+		platform = 'windows'
+		bits = ('64',) ## ('32', '64') ask interactivly
+	elif sys.platform in ('x11', 'linux', 'linux2'):
+		platform = 'linux'
+		bits = ('64',)
+	else:
+		log("Error: osx and other platforms not implemented (TODO)")
+		return 1
+
 	gen_bindings = len(os.listdir('src/godot-cpp/src/gen/')) == 1
 	compile = not os.path.exists('src/godot-cpp/bin/')
 	if gen_bindings or compile:
 		log("building native bindings")
-		
-		platform = ''
-		jobs = '-j6'
-		bits = None
-		
-		if sys.platform == 'win32':
-			platform = 'windows'
-			bits = ('64',) ## ('32', '64') ask interactivly
-		elif sys.platform in ('x11', 'linux', 'linux2'):
-			platform = 'linux'
-			bits = ('64',)
-		else:
-			log("Error: osx and other platforms not implemented (TODO)")
-			return 1
-			
 		os.chdir('src/godot-cpp/')
 		gen_bindings = 'yes' if gen_bindings else 'no'
 		for _bits in bits:
 			ec = os.system('scons platform=%s bits=%s generate_bindings=%s %s' % (
 				platform, _bits, gen_bindings, jobs))
 			if ec != 0: break
-		os.chdir('../../')
-		
 		if ec == 0:
 			log('native bindings compiled successfully')
-		return ec
-		
-	log("native bindings found")
-	return 0
+		os.chdir('../../')
+
+	## Compile miniscript. (Fixme: True because it's constantly changing).
+	if True:
+		log("building miniscript language")
+		sys.path.insert(1, 'src/miniscript/')
+		import msConfigure
+		os.chdir('src/miniscript/')
+		msConfigure.main()
+		for _bits in bits:
+			ec = os.system('scons bits=%s %s' % (_bits, jobs))
+			if ec != 0: break
+		if ec == 0:
+			log('miniscript building completed successfully')
+		os.chdir('../../')
+
+	log("done building native libs")
+	return ec
 
 
 if __name__ == '__main__':

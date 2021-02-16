@@ -1,9 +1,7 @@
 
 # Glitcher ignore list
 build/
-Glitcher/test/
 src/test/
-Glitcher/.import/
 release/
 debug/
 *__pycache__/
