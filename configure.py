@@ -3,6 +3,7 @@ import json
 
 ## To sync submodule:
 ## git submodule update --remote -- src/miniscript
+## Last stable godot-cpp commit: eafe6d96226da5ebf02ec35ca1599a45dd794cfc
 
 CONFIG_FILE = 'config.json'
 
@@ -111,9 +112,9 @@ def check_native_bindings():
 	if True:
 		log("building miniscript language")
 		sys.path.insert(1, 'src/miniscript/')
-		import msConfigure
+		import ms_configure
 		os.chdir('src/miniscript/')
-		msConfigure.main()
+		ms_configure.main()
 		for _bits in bits:
 			ec = os.system('scons bits=%s %s' % (_bits, jobs))
 			if ec != 0: break

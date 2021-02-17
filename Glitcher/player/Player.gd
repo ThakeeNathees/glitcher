@@ -9,12 +9,18 @@ const GRAVITY = 600
 const JUMP_FORCE = 300
 
 var motion = Vector2.ZERO
-
 onready var sprite = $Sprite
 
+## TODO: testing (call run_miniscript() if KEY_I pressed)
+func _input(event):
+	if event is InputEventKey:
+		if event.pressed and event.scancode == KEY_I:
+			pass
+
+func _ready():
+	pass
+
 func _physics_process(delta):
-	
-	print(MiniScript.test_hello())
 	
 	var x_input = int(Input.is_key_pressed(KEY_D)) - \
 				  int(Input.is_key_pressed(KEY_A))

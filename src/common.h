@@ -9,7 +9,6 @@
 #include <Godot.hpp>
 using namespace godot;
 
-
 #ifdef DEBUG
 
 #include <stdio.h>
