@@ -6,7 +6,8 @@
 [node name="MSEditor" type="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0
-rect_min_size = Vector2( 512, 300 )
+margin_bottom = 1.52588e-05
+rect_min_size = Vector2( 160, 90 )
 theme = ExtResource( 1 )
 script = ExtResource( 2 )
 __meta__ = {
@@ -23,14 +24,14 @@ __meta__ = {
 }
 
 [node name="TopBar" type="Label" parent="Layout"]
-margin_right = 1024.0
+margin_right = 320.0
 margin_bottom = 22.0
 text = "The Top Bar Placeholder"
 
 [node name="Body" type="HSplitContainer" parent="Layout"]
 margin_top = 26.0
-margin_right = 1024.0
-margin_bottom = 600.0
+margin_right = 320.0
+margin_bottom = 180.0
 size_flags_vertical = 3
 split_offset = 100
 __meta__ = {
@@ -39,25 +40,25 @@ __meta__ = {
 
 [node name="FileTree" type="Tree" parent="Layout/Body"]
 margin_right = 101.0
-margin_bottom = 574.0
+margin_bottom = 154.0
 
 [node name="TextArea" type="VSplitContainer" parent="Layout/Body"]
 margin_left = 109.0
-margin_right = 1024.0
-margin_bottom = 574.0
-split_offset = 105
+margin_right = 320.0
+margin_bottom = 154.0
+split_offset = 64
 
 [node name="TextEdit" type="TextEdit" parent="Layout/Body/TextArea"]
-margin_right = 915.0
-margin_bottom = 113.0
+margin_right = 211.0
+margin_bottom = 72.0
 syntax_highlighting = true
 show_line_numbers = true
 highlight_all_occurrences = true
 
 [node name="Console" type="RichTextLabel" parent="Layout/Body/TextArea"]
-margin_top = 121.0
-margin_right = 915.0
-margin_bottom = 574.0
+margin_top = 80.0
+margin_right = 211.0
+margin_bottom = 154.0
 
 [node name="run" type="Button" parent="."]
 margin_left = 163.0
