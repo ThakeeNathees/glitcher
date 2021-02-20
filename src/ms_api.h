@@ -10,11 +10,10 @@
 #include <vector>
 
 #include "common.h"
-#include "miniscript.h"
 #include "types.h"
+#include "miniscript.h"
 
 #include <Node.hpp>
-
 
 // MiniScript is an autoloaded script in godot. And it should be treated like
 // a global state machine. One need to clean errors or stdout before running

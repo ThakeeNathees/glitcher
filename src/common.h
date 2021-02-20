@@ -6,6 +6,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <GlobalConstants.hpp>
 #include <Godot.hpp>
 using namespace godot;
 
