@@ -24,20 +24,94 @@ void MSEditor::_register_methods() {
   register_method("_process", &MSEditor::_process);
   register_method("_draw", &MSEditor::_draw);
   register_method("_input", &MSEditor::_input);
+
+  register_method("_on_blink_timeout", &MSEditor::_on_blink_timeout);
+
+  register_method("get_text", &MSEditor::get_text);
+  register_method("clear_errors", &MSEditor::clear_errors);
+  register_method("set_line_error", &MSEditor::set_line_error);
+
+  // TEMP.
+  register_method("set_test_color", &MSEditor::set_test_color);
+}
+
+MSEditor::MSEditor() {
+  lines.push_back("");
+
+  highlighter.col_white = Color(1, 1, 1);
+  highlighter.col_black = Color(0, 0, 0);
+  highlighter.col_number = Color(0.92, 0.67, 0.39); // Color(1, 0.5, 0.31, 1);    // Orange.
+  highlighter.col_string = Color(0.12, 0.80, 0.39);   // Green.
+  highlighter.col_comment = Color(.45, .45, .45);     // Gray.
+  highlighter.col_keyword = Color(1, .3, .5);         // Red.
+  highlighter.col_function = Color(0.52, 0.64, 0.90); // Blue.
+
+  highlighter.keywords.push_back("def");
+  highlighter.keywords.push_back("native");
+  highlighter.keywords.push_back("function");
+  highlighter.keywords.push_back("end");
+  highlighter.keywords.push_back("null");
+  highlighter.keywords.push_back("self");
+  highlighter.keywords.push_back("in");
+  highlighter.keywords.push_back("and");
+  highlighter.keywords.push_back("or");
+  highlighter.keywords.push_back("not");
+  highlighter.keywords.push_back("true");
+  highlighter.keywords.push_back("false");
+  highlighter.keywords.push_back("do");
+  highlighter.keywords.push_back("while");
+  highlighter.keywords.push_back("for");
+  highlighter.keywords.push_back("if");
+  highlighter.keywords.push_back("elif");
+  highlighter.keywords.push_back("else");
+  highlighter.keywords.push_back("break");
+  highlighter.keywords.push_back("continue");
+  highlighter.keywords.push_back("return");
+
+  highlighter.builtin_fn.push_back("print");
+  highlighter.builtin_fn.push_back("import");
+  highlighter.builtin_fn.push_back("to_string");
+  highlighter.builtin_fn.push_back("min");
+  highlighter.builtin_fn.push_back("max");
+}
+
+MSEditor::~MSEditor() {
+  // TODO: not like this -> blink_timer->free();
 }
 
 void MSEditor::_init() {
-  lines.push_back("");
 }
 
 void MSEditor::_ready() {
   // Since the font is monospace it'll won't change with character.
   char_size = font.ptr()->get_string_size("A");
-  draw_start = Vector2(char_size.x * 4, char_size.y * 4);
+  draw_start = Vector2(char_size.x * 5, char_size.y * 4);
+
+  blink_timer = Timer::_new();
+  add_child(blink_timer);
+  blink_timer->start(); // TODO: only start timer if has_focus and stop if not.
+  blink_timer->set_wait_time(0.65);
+  blink_timer->connect("timeout", this, "_on_blink_timeout");
 }
 
 void MSEditor::_process() {
-  update();
+}
+
+String MSEditor::get_text() {
+  std::stringstream ss;
+  for (int i = 0; i < lines.size(); i++) {
+    if (i > 0) ss << "\n";
+    ss << lines[i];
+  }
+  return ss.str().c_str();
+}
+
+void MSEditor::clear_errors() {
+  error_lines.clear();
+}
+
+void MSEditor::set_line_error(int line) {
+  error_lines.insert(line-1); // error_lines are 0 based.
 }
 
 /*****************************************************************************
@@ -46,62 +120,106 @@ void MSEditor::_process() {
 
 void MSEditor::_draw() {
 
-  Vector2 _pos;
-  Vector2i _start = select.get_first();
-  Vector2i _end = select.get_second();
+#define _POS(_x, _y) (draw_start + Vector2((_x) * char_size.x, (_y) * char_size.y))
 
+  // Draw the background. (FIXME: magic numbers)
+  Color _col_bg = highlighter.col_black;
+  Vector2 _area_pos = _POS(-4, -1);
+  Vector2 _area_size = Vector2(char_size.x * line_width, char_size.y * line_height + font.ptr()->get_descent() + 2);
+  draw_rect(Rect2(_area_pos, _area_size), _col_bg);
 
-  // Draw the background.
-  Vector2 _area_pos = draw_start - Vector2( char_size.x * 3, char_size.y);
-  Vector2 _area_size = Vector2(char_size.x * 80, char_size.y * line_height + 4); // TODO: 80 chars per line. +4 space.
-  draw_rect(Rect2(_area_pos, _area_size), Color(0, 0, 0, 1));
+  // Selection region.
+  Vector2i _start = select.get_first(); // Start of the selection.
+  Vector2i _end = select.get_second();  // End of the selection.
 
-  for (int i = first_line; i < std::min(first_line + line_height, (int)lines.size()); i++) {
-    std::string& _line = lines[i];
+  highlighter.highlight(lines);
+  highlighter.start(first_line);
+  Color _col_cursor = highlighter.col_white;
 
-    _pos = draw_start + Vector2(0, (i - first_line) * char_size.y);
+  for (int i = first_line; i < first_line + line_height; i++) {
+
+    highlighter.newline();
+
+// Convinent macros to map line coordinate to screen coordinate.
+#define _POS_CHAR(_x, _y) _POS(_x, _y - first_line)
+#define _POS_RECT(_x, _y) (_POS(_x, _y - first_line) - Vector2(0, font.ptr()->get_ascent()))
 
     // Draw line numbers.
-    std::string line_num_str = std::to_string(i + 1); // 1 based number.
-    float line_num_offset = line_num_str.size() * char_size.x + 2; //<-- TODO: 2 is another magic number line spaceing.
-    draw_string(font, _pos - Vector2(line_num_offset, 0), line_num_str.c_str(), Color(1, 0.5, 0.31, 1));
+    std::string _line_num_str; // 1 based number.
+    Color _number_color;
+    if (i < lines.size()) {
+      _line_num_str = std::to_string(i + 1);
+      _number_color = highlighter.col_number;
+    } else {
+      _line_num_str = "~";
+      _number_color = highlighter.col_white;
+    }
+    Vector2 _line_num_offset = Vector2(2, 0);
+    draw_string(font, _POS_CHAR(-((int)_line_num_str.size()), i) - _line_num_offset, _line_num_str.c_str(), _number_color);
 
-    // Draw selection.
-    if (select.is_active()) {
-      if (_start.y <= i && i <= _end.y) {
-        Vector2 _select_pos = _pos - Vector2(0, font.ptr()->get_ascent());
-        Vector2 _select_size = Vector2(_line.size() * char_size.x, char_size.y);
-        _select_size.x = std::max(_select_size.x, char_size.x);
+    if (i >= lines.size()) continue;
+    std::string& _line = lines[i];
 
-        if (i == _start.y) { // start x position.
-          real_t _offset = char_size.x * _start.x;
-          _select_pos += Vector2(_offset, (real_t)0);
-          _select_size.x -= _offset;
-        }
+    // Draw the line. (j <= _line.size() is because to draw selection on an empty line).
+    for (int j = 0; j <= _line.size(); j++) {
+      if (j == _line.size() && _line.size() != 0) continue;
 
-        if (i == _end.y) {
-          real_t _offset = ((real_t)_line.size() - _end.x) * char_size.x;
-          _select_size.x -= _offset;
-        }
-
-        draw_rect(Rect2(_select_pos, _select_size), Color(0, 1, 1, 1));
+      Color col_char = highlighter.col_white;
+      if (_line.size() == 0 || j != _line.size()) {
+        col_char = highlighter.get(); // Empty line has a color (for multi line string).
       }
-    }
 
-    // Draw the line.
-    for (int j = 0; j < _line.size(); j++) {
+      // Update cursor color.
+      if (i == cursor.pos.y && j == cursor.pos.x) {
+        _col_cursor = col_char;
+      }
+
+      bool is_selected = false;
+      if (select.is_active()) {
+        if (i == _start.y) {
+          if (i == _end.y) {
+            // Selection start and end are the same line.
+            if (_start.x <= j && j <= _end.x) {
+              is_selected = true;
+            }
+          } else if (_start.x <= j) {
+            is_selected = true;
+          }
+        } else if (i == _end.y) {
+          if (j <= _end.x) {
+            is_selected = true;
+          }
+        } else if (_start.y < i && i < _end.y) {
+            is_selected = true;
+        }
+
+        // Draw the selection.
+        if (is_selected) {
+          draw_rect(Rect2(_POS_RECT(j, i), char_size), col_char);
+          col_char = _col_bg;
+        }
+      }
+      if (j == _line.size()) continue;
+
       String c = _line[j];
-      draw_char(font, _pos + Vector2(j * char_size.x, 0), c, "");
+      if (is_selected) col_char = Color(0, 0, 0);
+      draw_char(font, _POS_CHAR(j, i), c, "", col_char);
     }
-    //draw_string(font, _pos, _line.c_str());
   }
 
+  if (cursor_visible) {
+    // Draw cursor. (cursor size = char_size)
+    Vector2 _cursor_pos = _POS_RECT(cursor.pos.x, cursor.pos.y);
+    draw_rect(Rect2(_cursor_pos, char_size), _col_cursor);
 
-  // Draw cursor. (cursor size = char_size)
-  _pos = draw_start - Vector2(0, font.ptr()->get_ascent());
-  _pos.x += cursor.pos.x * char_size.x;
-  _pos.y += (cursor.pos.y - first_line) * char_size.y;
-  draw_rect(Rect2(_pos, char_size), Color(1, 1, 1, 1));
+    // Draw the char hovered by the cursor.
+    if (cursor.pos.x < lines[cursor.pos.y].size()) {
+      String c = lines[cursor.pos.y][cursor.pos.x];
+      Vector2 _char_pos = _POS_CHAR(cursor.pos.x, cursor.pos.y);
+      draw_char(font, _char_pos, c, "", _col_bg);
+    }
+  }
+
 }
 
 /*****************************************************************************
@@ -127,9 +245,11 @@ void MSEditor::_input(Variant event) {
       if (select.is_active()) clear_selected();
       lines[cursor.pos.y].insert(cursor.pos.x, _printable.first);
       cursor.pos.x += _printable.second;
+      reset_blink_timer();
 
     } else if (key == GC::KEY_BACKSPACE) {
       handle_backspace();
+      reset_blink_timer();
 
     } else if (key == GC::KEY_ENTER) {
       if (select.is_active()) clear_selected();
@@ -153,12 +273,15 @@ void MSEditor::_input(Variant event) {
       cursor.pos.x = indentation;
 
       ensure_cursor_visible();
+      reset_blink_timer();
 
     } else if (is_key_navigation(key)) {
       handle_navigation(key);
+      reset_blink_timer();
 
     } else {
       // TODO: unhandled key.
+      // reset_blink_timer();
     }
 
 
@@ -167,13 +290,15 @@ void MSEditor::_input(Variant event) {
       cursor.intended = cursor.pos.x;
     }
 
+    // Call _draw() method.
+    update();
   }
 
   Ref<InputEventMouseMotion> mouse_button_event = event;
   if (mouse_button_event.is_valid()) {
     // TODO:
+    // update();
   }
-
 }
 
 
@@ -223,14 +348,17 @@ static int ctrl_move_pos(const std::string& line, int curr, bool left) {
     while (_pos > 0 && line[_pos - 1] == ' ') {
       _pos -= 1;
     }
+
     // Skip a word.
     while (_pos > 0) {
       char c = line[_pos - 1];
-      if (c == '_' || isalpha(c)) _pos -= 1;
+      if (IS_NAME(c)) _pos -= 1;
       else break;
     }
 
-  } else {
+    if (_pos == curr && _pos > 0)  return _pos - 1;
+
+  } else { // Right.
 
     while (_pos < line.size() && line[_pos] == ' ') {
       _pos += 1;
@@ -241,13 +369,15 @@ static int ctrl_move_pos(const std::string& line, int curr, bool left) {
 
     while (_pos < line.size()) {
       char c = line[_pos];
-      if (c == '_' || isalpha(c)) _pos += 1;
+      if (IS_NAME(c)) _pos += 1;
       else break;
     }
 
     while (_pos < line.size() && line[_pos] == ' ') {
       _pos += 1;
     }
+
+    if (_pos == curr && _pos < line.size()) return _pos + 1;
   }
   
   return _pos;
@@ -421,4 +551,207 @@ void MSEditor::ensure_cursor_visible() {
   if (cursor.pos.y < first_line) {
     first_line = cursor.pos.y;
   }
+}
+
+void MSEditor::reset_blink_timer() {
+  // TODO: if (visible and has_focus) reset otherwise return.
+  cursor_visible = true;
+  blink_timer->stop();
+  blink_timer->start();
+}
+
+/*****************************************************************************
+ * SYNTAX HIGHLIGHTING                                                       *
+ *****************************************************************************/
+
+void SyntaxHighlight::start(int first_line) {
+  curr_line = first_line - 1; // newline() imediatly follows.
+  curr_col = 0;
+  index = 0;
+}
+
+void SyntaxHighlight::newline() {
+  curr_line += 1;
+  curr_col = 0;
+  index = 0;
+}
+
+Color SyntaxHighlight::get() {
+  if (data[curr_line][index].second < curr_col) {
+    index++;
+  }
+  curr_col++;
+  return data[curr_line][index].first;
+}
+
+void SyntaxHighlight::highlight(std::vector<std::string>& lines) {
+  data.clear();
+
+  // Numbers, strings, comment, symbols, keywords, attrib, call, just name.
+
+  bool in_string = false;
+  bool double_quote = false; // String type.
+
+  for (std::string& line : lines) {
+
+    data.push_back({});
+    std::vector<std::pair<Color, int>>& line_colors = data[data.size() - 1];
+
+    if (line.size() == 0) { // Empty line.
+      if (in_string) {
+        line_colors.push_back({col_string, 0});
+      } else {
+        line_colors.push_back({ col_white, 0 });
+      }
+      continue;
+    }
+
+    int i = 0;
+    while (i < line.size()) {
+
+      // If already in string end it.
+      if (in_string) {
+        while (i < line.size()) {
+          char c = line[i];
+          // TODO: handle_escape();
+          if (double_quote && c == '"') {
+            in_string = false;
+            line_colors.push_back({ col_string, i++ });
+            break;
+          }
+          if (!double_quote && c == '\'') {
+            in_string = false;
+            line_colors.push_back({ col_string, i++ });
+            break;
+          }
+          i++;
+        }
+        if (/*still*/in_string) { // Complete line is inside the string.
+          line_colors.push_back({ col_string, i++ });
+        }
+        continue;
+      }
+
+      char c = line[i];
+      switch (c) {
+        
+        case '\'':
+        case '"': {
+          ASSERT(!in_string, OOPS);
+
+          in_string = true;
+          double_quote = c == '"';
+          
+          if (i + 1 == line.size()) {
+            line_colors.push_back({ col_string, i++ });
+          
+          } else {
+            i++;
+            bool excape_next = false;
+            while (i < line.size()) {
+              if (line[i] == c) { // check end quote.
+                in_string = false;
+                break;
+              }
+              // TODO: escape char.
+              i++;
+            }
+            line_colors.push_back({ col_string, i++ }); // i++ will consume end quote.
+          }
+        } break;
+
+        case '#': { // Hard coded for miniscript.
+          i = (int)line.size();
+          line_colors.push_back({ col_comment, i });
+        } break;
+
+        case ' ':
+        case '\t': {
+          while (i < line.size()) {
+            if (line[i] != ' ' && line[i] != '\t') break;
+            i++;
+          }
+          line_colors.push_back({ col_white, i - 1 });
+        } break;
+
+         //TODO:
+        default:
+        {
+          // Number.
+          if ('0' <= c && c <= '9') {
+            bool _decimal = false; // True if decimal point found.
+            while (i < line.size()) {
+              c = line[i];
+              if (c != '.' && (c < '0' || '9' < c)) break;
+              if (_decimal && c == '.') break;
+
+              if (c == '.') {
+                // Range syntax is 0..10 so don't consume 2 dots.
+                if (i <= line.size() - 2 && line[i + 1] == '.') break;
+                _decimal = true;
+              }
+              i++;
+            }
+            line_colors.push_back({ col_number, i - 1 });
+            break;
+          }
+
+          // Word.
+          if (IS_NAME(c)) {
+            std::string word;
+            int j = i;
+            while (j < line.size()) {
+              if (!IS_NAME(line[j])) {
+                break;
+              }
+              j++;
+            }
+            word = line.substr(i, j - i);
+            i = j - 1; // i is at the last letter of the word.
+          
+            bool _is_colored = false; // True if done with the word.
+            for (std::string& kw : keywords) {
+              if (word == kw) {
+                line_colors.push_back({ col_keyword, i++ });
+                _is_colored = true;
+                break;
+              }
+            }
+            if (_is_colored) break;
+
+            for (std::string& kw : builtin_fn) {
+              if (word == kw) {
+                line_colors.push_back({ col_function, i++ });
+                _is_colored = true;
+                break;
+              }
+            }
+            if (_is_colored) break;
+
+
+            // Other words.
+            line_colors.push_back({ col_white, i++ });
+
+            break;
+          }
+
+          // TODO:
+
+          line_colors.push_back({ col_white, i++ });
+
+        } break;
+      }
+    }
+
+  }
+}
+
+/*****************************************************************************/
+/* SIGNAL RECIVERS                                                           */
+/*****************************************************************************/
+
+void MSEditor::_on_blink_timeout() {
+  // TODO: is_visible and has_focus -> update()
+  cursor_visible = !cursor_visible;
+  update();
 }

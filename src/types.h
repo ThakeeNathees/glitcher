@@ -8,6 +8,16 @@
 
 #include "common.h"
 
+#include <algorithm>
+#include <vector>
+#include <set>
+#include <string>
+#include <sstream>
+#include <map>
+
+// Matches alphabat, numbers and underscore.
+#define IS_NAME(c) (c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'))
+
 /*****************************************************************************
  * API                                                                       *
  *****************************************************************************/
@@ -84,5 +94,45 @@ struct Selection {
 
 };
 
+
+class SyntaxHighlight {
+  /* It'll color till the <pair.second> index.
+    def func_name( ...
+      ||        ||
+      ||        |<bracket_color, 14>
+      ||        <fn_color, 13>
+      |<white, 4>
+      <kw_color, 3>
+  */
+  std::vector< //< Array of line highlightings.
+    std::vector<std::pair<Color, int>>
+  > data;
+
+  // Coloring process state.
+  int curr_line = -1; // Because newline() will increase to 0.
+  int curr_col = 0;
+  int index = 0; // Last colored pair index.
+
+public:
+  Color col_white;
+  Color col_black;
+  Color col_number;
+  Color col_string;
+  Color col_comment;
+  Color col_function;
+
+  std::vector<std::string> keywords;
+  std::vector<std::string> builtin_fn;
+  Color col_keyword;
+
+  Color _col_test;
+
+  void highlight(std::vector<std::string>& lines);
+
+  void start(int first_line);   // It'll start coloring process.
+  void newline(); // Increase to the next line (because it's is easier).
+  Color get();    // Returns the color for the next char.
+
+};
 
 #endif // MS_TYPES_H
